@@ -1,0 +1,442 @@
+const express = require('express');
+const WebSocket = require('ws');
+const http = require('http');
+const path = require('path');
+const cors = require('cors');
+require('dotenv').config();
+
+const { Manager } = require('./room/manager');
+const RoomHandler = require('./handlers/room');
+const { WSHandler, StreamHandler } = require('./handlers/websocket');
+
+// Environment variables
+const PORT = process.env.PORT || 8080;
+const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
+const NODE_ENV = process.env.NODE_ENV || 'development';
+
+// Initialize
+const app = express();
+const server = http.createServer(app);
+const manager = new Manager();
+
+// Handlers
+const roomHandler = new RoomHandler(manager, BASE_URL);
+const wsHandler = new WSHandler(manager);
+const streamHandler = new StreamHandler(manager);
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// Add WebSocket support headers
+app.use((req, res, next) => {
+  if (req.url.startsWith('/ws')) {
+    // Set headers for WebSocket upgrade
+    res.setHeader('Upgrade', 'websocket');
+    res.setHeader('Connection', 'Upgrade');
+  }
+  next();
+});
+
+// API Routes
+app.post('/api/room', roomHandler.createRoom);
+app.post('/api/room/:roomId/invite', roomHandler.addInvite);
+app.get('/api/qr/:token', roomHandler.getQRCode);
+
+// Health check for hosting platforms
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'healthy' });
+});
+
+// Redirect root to a placeholder
+app.get('/', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html><head><title>Welcome</title>
+    <style>body{font-family:Arial;text-align:center;padding:50px;background:#f5f5f5}
+    h1{color:#333}p{color:#666}</style></head>
+    <body><h1>🌐 Service Running</h1>
+    <p>This is a private messaging service.</p>
+    <p>Access is by invitation only.</p></body></html>
+  `);
+});
+
+// Admin page - secret URL
+app.get('/admin-panel-secret-access-2026', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/index.html'));
+});
+
+// Chat page - validates token before serving
+app.get('/c/:token', (req, res) => {
+  const token = req.params.token;
+  const userIP = req.ip || req.connection.remoteAddress;
+
+  const { room, valid } = manager.checkInvite(token, userIP);
+  if (!valid || !room) {
+    return res.status(403).send('This invite link has already been used');
+  }
+  
+  // Serve static HTML
+  res.sendFile(path.join(__dirname, '../frontend/chat.html'));
+});
+
+// Stream page - uses roomID directly (admin only)
+app.get('/s/:roomId', (req, res) => {
+  const roomId = req.params.roomId;
+  const room = manager.getRoom(roomId);
+  
+  if (!room) {
+    return res.status(404).send('Room not found');
+  }
+  
+  // Create simple template inline with bottom-to-top messages
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Chat Stream</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: transparent;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    .stream-container {
+      position: relative;
+      max-width: 400px;
+      height: 300px;
+      border: 2px solid #6366f1;
+      border-radius: 12px;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1));
+      padding: 12px;
+      overflow: hidden;
+    }
+
+    .stream-label {
+      position: absolute;
+      top: -2px;
+      left: 12px;
+      background: #6366f1;
+      color: white;
+      padding: 4px 12px;
+      border-radius: 0 0 8px 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      z-index: 10;
+    }
+
+    .messages {
+      height: 100%;
+      display: flex;
+      flex-direction: column-reverse; /* Bottom to top */
+      gap: 6px;
+      overflow-y: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      padding-top: 20px;
+    }
+
+    .messages::-webkit-scrollbar {
+      display: none;
+    }
+
+    .message {
+      background: rgba(0, 0, 0, 0.85);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 12px;
+      animation: slideInFromBottom 0.4s ease-out;
+      word-wrap: break-word;
+      border-left: 3px solid #6366f1;
+    }
+
+    .message .name {
+      font-weight: 700;
+      color: #a78bfa;
+      margin-right: 8px;
+      font-size: 0.85rem;
+    }
+
+    .message .content {
+      color: #fff;
+      font-size: 0.9rem;
+      line-height: 1.3;
+    }
+
+    .message .time {
+      font-size: 0.7rem;
+      color: #94a3b8;
+      margin-top: 2px;
+      text-align: right;
+    }
+
+    .message.system {
+      background: rgba(59, 130, 246, 0.6);
+      font-size: 0.8rem;
+      color: #e0e7ff;
+      font-style: italic;
+      text-align: center;
+      border-left: 3px solid #3b82f6;
+    }
+
+    @keyframes slideInFromBottom {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .connection-status {
+      position: absolute;
+      top: 4px;
+      right: 8px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+    }
+
+    .connection-status.offline {
+      background: #ef4444;
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+  </style>
+</head>
+<body>
+  <div class="stream-container">
+    <div class="stream-label">LIVE CHAT</div>
+    <div class="connection-status" id="status"></div>
+    <div class="messages" id="messages"></div>
+  </div>
+
+  <script>
+    const roomId = '${roomId}';
+    const maxMessages = 15;
+
+    connectWebSocket();
+
+    function connectWebSocket() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const ws = new WebSocket(\`\${protocol}//\${window.location.host}/ws-stream/\${roomId}\`);
+
+      ws.onopen = () => {
+        document.getElementById('status').classList.remove('offline');
+      };
+
+      ws.onclose = () => {
+        document.getElementById('status').classList.add('offline');
+        setTimeout(connectWebSocket, 3000);
+      };
+
+      ws.onerror = () => {
+        document.getElementById('status').classList.add('offline');
+      };
+
+      ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        if (msg.name === '__stream__') return;
+        renderMessage(msg);
+      };
+    }
+
+    function renderMessage(msg) {
+      const container = document.getElementById('messages');
+      const div = document.createElement('div');
+      div.className = msg.type === 'system' ? 'message system' : 'message';
+
+      if (msg.type === 'system') {
+        div.innerHTML = \`<div class="content">\${escapeHtml(msg.content)}</div>\`;
+      } else {
+        div.innerHTML = \`
+          <div><span class="name">\${escapeHtml(msg.name)}:</span><span class="content">\${escapeHtml(msg.content)}</span></div>
+          <div class="time">\${msg.timestamp}</div>
+        \`;
+      }
+
+      // Add to top (will appear at bottom due to flex-direction: column-reverse)
+      container.insertBefore(div, container.firstChild);
+
+      // Keep only recent messages
+      while (container.children.length > maxMessages) {
+        container.removeChild(container.lastChild);
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+  </script>
+</body>
+</html>`;
+  
+  res.send(html);
+});
+
+// Server-Sent Events endpoint for WebSocket fallback
+app.get('/sse/:token', (req, res) => {
+  const { token } = req.params;
+  const userName = req.query.name || 'Anonymous';
+  
+  // Validate token using invite manager
+  const invite = manager.checkInvite(token, req.ip);
+  if (!invite.valid) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+  
+  const room = invite.room;
+  if (!room) {
+    return res.status(404).json({ error: 'Room not found' });
+  }
+  
+  // Set SSE headers
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Cache-Control'
+  });
+  
+  // Create SSE client
+  const clientId = Math.random().toString(36).substring(2);
+  const client = {
+    id: clientId,
+    name: userName,
+    response: res,
+    type: 'sse',
+    joinedAt: new Date()
+  };
+  
+  room.addClient(client);
+  console.log(`SSE client ${userName} joined room ${room.id}`);
+  
+  // Send connection success
+  res.write(`data: ${JSON.stringify({ type: 'connected', message: 'Connected via SSE fallback' })}\n\n`);
+  
+  // Handle client disconnect
+  req.on('close', () => {
+    console.log(`SSE client ${userName} disconnected from room ${room.id}`);
+    room.removeClient(clientId);
+    res.end();
+  });
+  
+  req.on('error', (err) => {
+    console.error('SSE error:', err);
+    room.removeClient(clientId);
+    res.end();
+  });
+});
+
+// HTTP POST endpoint for sending messages via SSE/polling fallback
+app.post('/send/:token', express.json(), (req, res) => {
+  const { token } = req.params;
+  const { message, name } = req.body;
+  
+  if (!message || !name) {
+    return res.status(400).json({ error: 'Message and name required' });
+  }
+  
+  // Validate token using invite manager
+  const invite = manager.checkInvite(token, req.ip);
+  if (!invite.valid) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+  
+  const room = invite.room;
+  if (!room) {
+    return res.status(404).json({ error: 'Room not found' });
+  }
+  
+  // Create and broadcast message
+  const chatMessage = {
+    id: Date.now().toString(),
+    name: name,
+    message: message,
+    timestamp: new Date().toISOString()
+  };
+  
+  room.broadcast(chatMessage);
+  res.json({ success: true });
+});
+
+// HTTP polling endpoint for getting messages
+app.get('/poll/:token', (req, res) => {
+  const { token } = req.params;
+  const since = parseInt(req.query.since) || 0;
+  
+  // Validate token using invite manager
+  const invite = manager.checkInvite(token, req.ip);
+  if (!invite.valid) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+  
+  const room = invite.room;
+  let messages = [];
+  
+  if (room && room.getMessagesSince) {
+    messages = room.getMessagesSince(since);
+  }
+  
+  res.json({ messages, timestamp: Date.now() });
+});
+
+// Serve static files AFTER route handlers
+app.use(express.static(path.join(__dirname, '../frontend')));
+
+// Create WebSocket server with better routing
+const wss = new WebSocket.Server({ 
+  server,
+  perMessageDeflate: false, // Disable compression to avoid reserved bits issue
+  verifyClient: (info) => {
+    console.log('WebSocket verification:', info.req.url);
+    return true;
+  }
+});
+
+wss.on('connection', (ws, req) => {
+  const pathname = new URL(req.url, `http://${req.headers.host}`).pathname;
+  
+  console.log(`WebSocket connection to: ${pathname}`);
+  console.log('Headers:', req.headers);
+  
+  if (pathname.startsWith('/ws-stream/')) {
+    streamHandler.handleConnection(ws, req);
+  } else if (pathname.startsWith('/ws/')) {
+    wsHandler.handleConnection(ws, req);
+  } else {
+    console.log('Unknown WebSocket path:', pathname);
+    ws.close(1000, 'Invalid path');
+  }
+});
+
+// Start server
+server.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🌍 Environment: ${NODE_ENV}`);
+  console.log(`📱 Admin panel: ${BASE_URL}/admin-panel-secret-access-2024`);
+  console.log(`📺 Stream example: ${BASE_URL}/s/ROOM_ID`);
+});

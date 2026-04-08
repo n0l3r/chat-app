@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Chat Room Admin</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>💬 Chat Room</h1>
+      <p>Create a room and share the QR code</p>
+    </div>
+
+    <div class="card">
+      <button class="btn" id="createBtn" onclick="createRoom()">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M12 5v14m-7-7h14"/>
+        </svg>
+        Create New Room
+      </button>
+    </div>
+
+    <div class="card hidden" id="roomResult">
+      <div class="qr-container">
+        <img id="qrImage" src="" alt="QR Code">
+        <p style="margin-top:12px;color:#64748b;font-size:0.875rem;">Scan to join chat (single-use)</p>
+      </div>
+      
+      <button class="btn btn-outline mb-3" onclick="copyLink()">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <rect x="9" y="9" width="13" height="13" rx="2"/>
+          <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+        </svg>
+        Copy Chat Link
+      </button>
+
+      <button class="btn mb-3" onclick="addInvite()">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M12 5v14m-7-7h14"/>
+        </svg>
+        Generate New Invite
+      </button>
+
+      <button class="btn btn-outline" onclick="copyStreamLink()">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10"/>
+          <polygon points="10 8 16 12 10 16 10 8"/>
+        </svg>
+        Copy Stream Link (OBS)
+      </button>
+
+      <div style="margin-top:16px;padding:12px;background:#f1f5f9;border-radius:8px;font-size:0.875rem;color:#475569;">
+        <strong>💡 Admin Panel:</strong> Access via <code>/admin-panel-secret-access-2024</code>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentRoomId = null;
+    let currentToken = null;
+    let currentChatURL = null;
+    let currentStreamURL = null;
+
+    async function createRoom() {
+      const btn = document.getElementById('createBtn');
+      btn.disabled = true;
+      btn.textContent = 'Creating...';
+
+      try {
+        const res = await fetch('/api/room', { method: 'POST' });
+        const data = await res.json();
+        
+        currentRoomId = data.room_id;
+        currentToken = data.token;
+        currentChatURL = data.chat_url;
+        currentStreamURL = data.stream_url;
+        
+        document.getElementById('qrImage').src = data.qr_url;
+        document.getElementById('roomResult').classList.remove('hidden');
+        
+      } catch (err) {
+        alert('Failed to create room');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M12 5v14m-7-7h14"/>
+          </svg>
+          Create New Room
+        `;
+      }
+    }
+
+    async function addInvite() {
+      if (!currentRoomId) return;
+
+      try {
+        const res = await fetch(`/api/room/${currentRoomId}/invite`, { method: 'POST' });
+        const data = await res.json();
+        
+        currentToken = data.token;
+        currentChatURL = data.chat_url;
+        
+        document.getElementById('qrImage').src = data.qr_url;
+        alert('New invite generated! Previous link is now invalid for new users.');
+        
+      } catch (err) {
+        alert('Failed to generate invite');
+      }
+    }
+
+    function copyLink() {
+      if (!currentChatURL) return;
+      navigator.clipboard.writeText(currentChatURL).then(() => {
+        alert('Chat link copied! (single-use)');
+      }).catch(() => {
+        prompt('Copy this link:', currentChatURL);
+      });
+    }
+
+    function copyStreamLink() {
+      if (!currentStreamURL) return;
+      navigator.clipboard.writeText(currentStreamURL).then(() => {
+        alert('Stream link copied!');
+      }).catch(() => {
+        prompt('Copy this link:', currentStreamURL);
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Chat</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: transparent;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    .messages {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-width: 400px;
+    }
+
+    .message {
+      background: rgba(0, 0, 0, 0.75);
+      color: white;
+      padding: 10px 14px;
+      border-radius: 8px;
+      animation: slideIn 0.3s ease;
+    }
+
+    .message .name {
+      font-weight: 600;
+      color: #a78bfa;
+      margin-right: 8px;
+    }
+
+    .message .content {
+      color: #fff;
+    }
+
+    .message.system {
+      background: rgba(100, 100, 100, 0.5);
+      font-size: 0.85rem;
+      color: #ccc;
+      font-style: italic;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    /* Auto-fade old messages */
+    .message.fading {
+      animation: fadeOut 1s ease forwards;
+    }
+
+    @keyframes fadeOut {
+      to {
+        opacity: 0;
+        transform: translateX(-20px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="messages" id="messages"></div>
+
+  <script>
+    const roomId = '{{.roomId}}';
+
+    if (!roomId) {
+      document.body.innerHTML = '<p style="color:red">Invalid room</p>';
+    } else {
+      connectWebSocket();
+    }
+
+    const maxMessages = 10;
+    const fadeAfter = 0;
+
+    function connectWebSocket() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const ws = new WebSocket(`${protocol}//${window.location.host}/ws-stream/${roomId}`);
+
+      ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        renderMessage(msg);
+      };
+
+      ws.onclose = () => setTimeout(connectWebSocket, 3000);
+    }
+
+    function renderMessage(msg) {
+      const container = document.getElementById('messages');
+      const div = document.createElement('div');
+      div.className = msg.type === 'system' ? 'message system' : 'message';
+
+      if (msg.type === 'system') {
+        div.textContent = msg.content;
+      } else {
+        div.innerHTML = `<span class="name">${escapeHtml(msg.name)}:</span><span class="content">${escapeHtml(msg.content)}</span>`;
+      }
+
+      container.appendChild(div);
+
+      // Limit messages
+      while (container.children.length > maxMessages) {
+        container.removeChild(container.firstChild);
+      }
+
+      // Auto-fade after X seconds
+      if (fadeAfter > 0) {
+        setTimeout(() => {
+          div.classList.add('fading');
+          setTimeout(() => div.remove(), 1000);
+        }, fadeAfter * 1000);
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+  </script>
+</body>
+</html>
