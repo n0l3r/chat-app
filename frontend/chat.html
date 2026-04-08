@@ -23,14 +23,12 @@
       <h1>💬 Chat Room</h1>
       <span class="room-badge" id="roomBadge">Room: ---</span>
       <div class="status">
-        <span class="connection-status disconnected" id="connectionStatus">
-          Connecting...
-          <span id="connectionMethod"></span>
-        </span>
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Connecting...</span>
       </div>
     </div>
 
-    <div class="messages" id="messageList"></div>
+    <div class="messages" id="messages"></div>
 
     <div class="chat-input">
       <input type="text" id="messageInput" placeholder="Type a message..." maxlength="500">
@@ -42,7 +40,6 @@
     </div>
   </div>
 
-  <script src="/js/fallback.js"></script>
   <script src="/js/chat.js"></script>
 </body>
 </html>

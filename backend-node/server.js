@@ -28,33 +28,10 @@ const streamHandler = new StreamHandler(manager);
 app.use(cors());
 app.use(express.json());
 
-// Add WebSocket support headers
-app.use((req, res, next) => {
-  if (req.url.startsWith('/ws')) {
-    // Set headers for WebSocket upgrade
-    res.setHeader('Upgrade', 'websocket');
-    res.setHeader('Connection', 'Upgrade');
-  }
-  next();
-});
-
 // API Routes
 app.post('/api/room', roomHandler.createRoom);
 app.post('/api/room/:roomId/invite', roomHandler.addInvite);
 app.get('/api/qr/:token', roomHandler.getQRCode);
-
-// Health check for hosting platforms
-app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
-});
-
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'healthy' });
-});
 
 // Redirect root to a placeholder
 app.get('/', (req, res) => {
@@ -296,140 +273,17 @@ app.get('/s/:roomId', (req, res) => {
   res.send(html);
 });
 
-// Server-Sent Events endpoint for WebSocket fallback
-app.get('/sse/:token', (req, res) => {
-  const { token } = req.params;
-  const userName = req.query.name || 'Anonymous';
-  
-  // Validate token using invite manager
-  const invite = manager.checkInvite(token, req.ip);
-  if (!invite.valid) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
-  }
-  
-  const room = invite.room;
-  if (!room) {
-    return res.status(404).json({ error: 'Room not found' });
-  }
-  
-  // Set SSE headers
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Cache-Control'
-  });
-  
-  // Create SSE client
-  const clientId = Math.random().toString(36).substring(2);
-  const client = {
-    id: clientId,
-    name: userName,
-    response: res,
-    type: 'sse',
-    joinedAt: new Date()
-  };
-  
-  room.addClient(client);
-  console.log(`SSE client ${userName} joined room ${room.id}`);
-  
-  // Send connection success
-  res.write(`data: ${JSON.stringify({ type: 'connected', message: 'Connected via SSE fallback' })}\n\n`);
-  
-  // Handle client disconnect
-  req.on('close', () => {
-    console.log(`SSE client ${userName} disconnected from room ${room.id}`);
-    room.removeClient(clientId);
-    res.end();
-  });
-  
-  req.on('error', (err) => {
-    console.error('SSE error:', err);
-    room.removeClient(clientId);
-    res.end();
-  });
-});
-
-// HTTP POST endpoint for sending messages via SSE/polling fallback
-app.post('/send/:token', express.json(), (req, res) => {
-  const { token } = req.params;
-  const { message, name } = req.body;
-  
-  if (!message || !name) {
-    return res.status(400).json({ error: 'Message and name required' });
-  }
-  
-  // Validate token using invite manager
-  const invite = manager.checkInvite(token, req.ip);
-  if (!invite.valid) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
-  }
-  
-  const room = invite.room;
-  if (!room) {
-    return res.status(404).json({ error: 'Room not found' });
-  }
-  
-  // Create and broadcast message
-  const chatMessage = {
-    id: Date.now().toString(),
-    name: name,
-    message: message,
-    timestamp: new Date().toISOString()
-  };
-  
-  room.broadcast(chatMessage);
-  res.json({ success: true });
-});
-
-// HTTP polling endpoint for getting messages
-app.get('/poll/:token', (req, res) => {
-  const { token } = req.params;
-  const since = parseInt(req.query.since) || 0;
-  
-  // Validate token using invite manager
-  const invite = manager.checkInvite(token, req.ip);
-  if (!invite.valid) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
-  }
-  
-  const room = invite.room;
-  let messages = [];
-  
-  if (room && room.getMessagesSince) {
-    messages = room.getMessagesSince(since);
-  }
-  
-  res.json({ messages, timestamp: Date.now() });
-});
-
 // Serve static files AFTER route handlers
 app.use(express.static(path.join(__dirname, '../frontend')));
 
-// Create WebSocket server with better routing
-const wss = new WebSocket.Server({ 
-  server,
-  perMessageDeflate: false, // Disable compression to avoid reserved bits issue
-  verifyClient: (info) => {
-    console.log('WebSocket verification:', info.req.url);
-    return true;
-  }
-});
+// Create WebSocket server
+const wss = new WebSocket.Server({ server });
 
 wss.on('connection', (ws, req) => {
-  const pathname = new URL(req.url, `http://${req.headers.host}`).pathname;
-  
-  console.log(`WebSocket connection to: ${pathname}`);
-  console.log('Headers:', req.headers);
-  
-  if (pathname.startsWith('/ws-stream/')) {
+  if (req.url.includes('/ws-stream/')) {
     streamHandler.handleConnection(ws, req);
-  } else if (pathname.startsWith('/ws/')) {
-    wsHandler.handleConnection(ws, req);
   } else {
-    console.log('Unknown WebSocket path:', pathname);
-    ws.close(1000, 'Invalid path');
+    wsHandler.handleConnection(ws, req);
   }
 });
 
