@@ -132,7 +132,8 @@ app.get('/s/:roomId', (req, res) => {
 
     .message {
       background: rgba(0, 0, 0, 0.5);
-      box-shadow: 5px 10px #f1f5f9;
+      border: 1px solid #e5e5e5;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
       color: white;
       padding: 8px 12px;
       border-radius: 12px;
