@@ -119,7 +119,7 @@ app.get('/s/:roomId', (req, res) => {
       height: 100%;
       display: flex;
       flex-direction: column-reverse; /* Bottom to top */
-      gap: 6px;
+      gap: 20px;
       overflow-y: auto;
       scrollbar-width: none;
       -ms-overflow-style: none;
@@ -139,7 +139,7 @@ app.get('/s/:roomId', (req, res) => {
       border-radius: 50px;
       animation: slideInFromBottom 0.4s ease-out;
       word-wrap: break-word;
-      font-weight: bold;
+      /*font-weight: bold;*/
       /*border-left: 3px solid #6366f1;*/
     }
 
@@ -255,7 +255,6 @@ app.get('/s/:roomId', (req, res) => {
       div.innerHTML = \`
         <div class="name">\${escapeHtml(safeName)}</div>
         <div class="content">\${escapeHtml(safeContent)}</div>
-        <div class="time">\${safeTime}</div>
       \`;
       div.querySelector('.name').style.color = getNameColor(safeName);
 
