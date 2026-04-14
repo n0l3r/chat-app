@@ -145,19 +145,19 @@ app.get('/s/:roomId', (req, res) => {
       color: #a78bfa;
       display: block;
       margin-bottom: 8px;
-      font-size: 2.8rem;
+      font-size: 3.5rem;
       line-height: 1.1;
     }
 
     .message .content {
       display: block;
       color: #fff;
-      font-size: 3rem;
+      font-size: 4rem;
       line-height: 1.2;
     }
 
     .message .time {
-      font-size: 1.5rem;
+      font-size: 2.5rem;
       color: #94a3b8;
       margin-top: 8px;
       text-align: right;
