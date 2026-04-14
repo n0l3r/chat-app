@@ -94,7 +94,7 @@ app.get('/s/:roomId', (req, res) => {
     .stream-container {
       position: relative;
       max-width: 1500px;
-      height: 100%;
+      min-height: 100%;
       border: 2px solid #6366f1;
       border-radius: 12px;
       background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1));
