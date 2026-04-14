@@ -93,7 +93,7 @@ app.get('/s/:roomId', (req, res) => {
 
     .stream-container {
       position: relative;
-      max-width: 1000px;
+      max-width: 1200px;
       height: 1000px;
       border: 2px solid #6366f1;
       border-radius: 12px;
