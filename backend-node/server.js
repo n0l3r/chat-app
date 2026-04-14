@@ -86,15 +86,15 @@ app.get('/s/:roomId', (req, res) => {
     
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: transparent;
+      background: green;
       min-height: 100vh;
       padding: 16px;
     }
 
     .stream-container {
       position: relative;
-      max-width: 400px;
-      height: 300px;
+      max-width: 1000px;
+      height: 1000px;
       border: 2px solid #6366f1;
       border-radius: 12px;
       background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1));
@@ -131,32 +131,35 @@ app.get('/s/:roomId', (req, res) => {
     }
 
     .message {
-      background: rgba(0, 0, 0, 0.85);
+      background: rgba(0, 0, 0, 0.5);
       color: white;
       padding: 8px 12px;
       border-radius: 12px;
       animation: slideInFromBottom 0.4s ease-out;
       word-wrap: break-word;
-      border-left: 3px solid #6366f1;
+      /*border-left: 3px solid #6366f1;*/
     }
 
     .message .name {
       font-weight: 700;
       color: #a78bfa;
-      margin-right: 8px;
-      font-size: 0.85rem;
+      display: block;
+      margin-bottom: 8px;
+      font-size: 2.55rem;
+      line-height: 1.1;
     }
 
     .message .content {
+      display: block;
       color: #fff;
-      font-size: 0.9rem;
-      line-height: 1.3;
+      font-size: 2.7rem;
+      line-height: 1.2;
     }
 
     .message .time {
-      font-size: 0.7rem;
+      font-size: 1.5rem;
       color: #94a3b8;
-      margin-top: 2px;
+      margin-top: 8px;
       text-align: right;
     }
 
@@ -211,6 +214,7 @@ app.get('/s/:roomId', (req, res) => {
   <script>
     const roomId = '${roomId}';
     const maxMessages = 15;
+    const nameColorMap = new Map();
 
     connectWebSocket();
 
@@ -233,7 +237,7 @@ app.get('/s/:roomId', (req, res) => {
 
       ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
-        if (msg.name === '__stream__') return;
+        if (msg.name === '__stream__' || msg.type === 'system') return;
         renderMessage(msg);
       };
     }
@@ -241,16 +245,16 @@ app.get('/s/:roomId', (req, res) => {
     function renderMessage(msg) {
       const container = document.getElementById('messages');
       const div = document.createElement('div');
-      div.className = msg.type === 'system' ? 'message system' : 'message';
-
-      if (msg.type === 'system') {
-        div.innerHTML = \`<div class="content">\${escapeHtml(msg.content)}</div>\`;
-      } else {
-        div.innerHTML = \`
-          <div><span class="name">\${escapeHtml(msg.name)}:</span><span class="content">\${escapeHtml(msg.content)}</span></div>
-          <div class="time">\${msg.timestamp}</div>
-        \`;
-      }
+      const safeName = msg.name || 'Anonymous';
+      const safeContent = msg.content || '';
+      const safeTime = msg.timestamp || '';
+      div.className = 'message';
+      div.innerHTML = \`
+        <div class="name">\${escapeHtml(safeName)}</div>
+        <div class="content">\${escapeHtml(safeContent)}</div>
+        <div class="time">\${safeTime}</div>
+      \`;
+      div.querySelector('.name').style.color = getNameColor(safeName);
 
       // Add to top (will appear at bottom due to flex-direction: column-reverse)
       container.insertBefore(div, container.firstChild);
@@ -265,6 +269,21 @@ app.get('/s/:roomId', (req, res) => {
       const div = document.createElement('div');
       div.textContent = text;
       return div.innerHTML;
+    }
+
+    function getNameColor(name) {
+      if (nameColorMap.has(name)) return nameColorMap.get(name);
+
+      let hash = 0;
+      for (let i = 0; i < name.length; i++) {
+        hash = ((hash << 5) - hash) + name.charCodeAt(i);
+        hash |= 0;
+      }
+
+      const hue = Math.abs(hash) % 360;
+      const color = \`hsl(\${hue} 85% 70%)\`;
+      nameColorMap.set(name, color);
+      return color;
     }
   </script>
 </body>

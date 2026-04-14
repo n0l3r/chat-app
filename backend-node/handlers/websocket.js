@@ -31,19 +31,6 @@ class WSHandler {
 
     room.addClient(client);
 
-    // Send join message
-    const joinMsg = {
-      type: 'system',
-      name: userName,
-      content: `${userName} joined the chat`,
-      timestamp: new Date().toLocaleTimeString('en-US', { 
-        hour12: false, 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      })
-    };
-    room.broadcast(joinMsg);
-
     // Handle incoming messages
     ws.on('message', (data) => {
       try {
