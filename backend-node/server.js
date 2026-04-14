@@ -133,12 +133,13 @@ app.get('/s/:roomId', (req, res) => {
     .message {
       background: rgba(0, 0, 0, 0.5);
       border: 5px solid #ffffff;
-      box-shadow: 0 10px 25px rgb(255,255,255);
+      box-shadow: 0 3px 5px rgb(255,255,255);
       color: white;
       padding: 8px 12px;
-      border-radius: 12px;
+      border-radius: 50px;
       animation: slideInFromBottom 0.4s ease-out;
       word-wrap: break-word;
+      font-weight: bold;
       /*border-left: 3px solid #6366f1;*/
     }
 
