@@ -2,67 +2,302 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Chat Room Admin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat Admin Panel</title>
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/admin.css">
 </head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>💬 Chat Room</h1>
-      <p>Create a room and share the QR code</p>
-    </div>
+<body class="admin-page">
 
-    <div class="card">
-      <button class="btn" id="createBtn" onclick="createRoom()">
-        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path d="M12 5v14m-7-7h14"/>
-        </svg>
-        Create New Room
-      </button>
-    </div>
-
-    <div class="card hidden" id="roomResult">
-      <div class="qr-container">
-        <img id="qrImage" src="" alt="QR Code">
-        <p style="margin-top:12px;color:#64748b;font-size:0.875rem;">Scan to join chat (single-use)</p>
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="admin-sidebar">
+    <div class="sidebar-brand">
+      <span class="sidebar-logo">💬</span>
+      <div>
+        <div class="sidebar-title">Chat Admin</div>
+        <div class="sidebar-subtitle">Control Panel</div>
       </div>
-      
-      <button class="btn btn-outline mb-3" onclick="copyLink()">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <rect x="9" y="9" width="13" height="13" rx="2"/>
-          <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
-        </svg>
-        Copy Chat Link
-      </button>
+    </div>
 
-      <button class="btn mb-3" onclick="addInvite()">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path d="M12 5v14m-7-7h14"/>
+    <nav class="admin-nav">
+      <button class="admin-nav-item active" onclick="switchTab('rooms', this)">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
         </svg>
-        Generate New Invite
+        Room Manager
       </button>
-
-      <button class="btn btn-outline" onclick="copyStreamLink()">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <circle cx="12" cy="12" r="10"/>
-          <polygon points="10 8 16 12 10 16 10 8"/>
+      <button class="admin-nav-item" onclick="switchTab('words', this)">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+          <line x1="8" y1="18" x2="21" y2="18"/>
+          <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/>
+          <line x1="3" y1="18" x2="3.01" y2="18"/>
         </svg>
-        Copy Stream Link (OBS)
+        Censored Words
       </button>
+    </nav>
 
-      <div style="margin-top:16px;padding:12px;background:#f1f5f9;border-radius:8px;font-size:0.875rem;color:#475569;">
-        <strong>💡 Admin Panel:</strong> Access via <code>/admin-panel-secret-access-2026</code>
+    <div class="sidebar-room-status hidden" id="sidebarRoomStatus">
+      <div class="sidebar-status-label">Active Room</div>
+      <div class="sidebar-status-id" id="sidebarRoomId">—</div>
+      <div class="sidebar-status-row">
+        <span class="sidebar-dot"></span>
+        <span>Live</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <main class="admin-main">
+
+    <!-- ========== TAB: Room Manager ========== -->
+    <div id="tab-rooms" class="tab-panel">
+      <div class="admin-page-header">
+        <div>
+          <h2 class="admin-page-title">Room Manager</h2>
+          <p class="admin-page-desc">Create rooms and manage live sessions</p>
+        </div>
+        <button class="btn" id="createBtn" onclick="createRoom()" style="width:auto;padding:0 20px;height:42px;">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M12 5v14m-7-7h14"/>
+          </svg>
+          Create New Room
+        </button>
+      </div>
+
+      <!-- Empty state -->
+      <div class="admin-empty" id="emptyState">
+        <div class="admin-empty-icon">🏠</div>
+        <h3>No active room</h3>
+        <p>Click "Create New Room" to get started</p>
+      </div>
+
+      <!-- Room dashboard (2 columns) -->
+      <div class="admin-room-grid hidden" id="roomResult">
+
+        <!-- ── Left: QR + Actions ── -->
+        <div class="card room-left-col">
+          <div class="qr-container">
+            <img id="qrImage" src="" alt="QR Code" onclick="viewQRDetail()" style="cursor:zoom-in;">
+            <p class="qr-caption">Scan to join the room</p>
+            <div class="qr-btn-row">
+              <button class="qr-btn" onclick="viewQRDetail()">
+                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+                </svg>
+                View
+              </button>
+              <button class="qr-btn" onclick="downloadQR()">
+                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Download
+              </button>
+            </div>
+          </div>
+
+          <div class="room-actions">
+            <button class="room-action-btn" onclick="copyLink()">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <rect x="9" y="9" width="13" height="13" rx="2"/>
+                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+              </svg>
+              Copy Chat Link
+            </button>
+            <button class="room-action-btn" onclick="addInvite()">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+              </svg>
+              Generate New Invite
+            </button>
+            <button class="room-action-btn" onclick="copyStreamLink()">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/>
+              </svg>
+              Copy Stream Link (OBS)
+            </button>
+            <button class="room-action-btn" onclick="openStream()">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+                <polyline points="15 3 21 3 21 9"/>
+                <line x1="10" y1="14" x2="21" y2="3"/>
+              </svg>
+              Open Stream
+            </button>
+          </div>
+        </div>
+
+        <!-- ── Right: Stats + Users + Chat + Pin ── -->
+        <div class="room-right-col">
+
+          <!-- Stats bar -->
+          <div class="stats-bar">
+            <div class="stat-card">
+              <div class="stat-icon purple">👥</div>
+              <div class="stat-info">
+                <div class="stat-value" id="statUsers">0</div>
+                <div class="stat-label">Connected</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon blue">💬</div>
+              <div class="stat-info">
+                <div class="stat-value" id="statMessages">0</div>
+                <div class="stat-label">Messages</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon green">📌</div>
+              <div class="stat-info">
+                <div class="stat-value" id="statPinStatus" style="font-size:0.875rem;line-height:1.4;">None</div>
+                <div class="stat-label">Pinned</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Users + Chat row -->
+          <div class="chat-users-row">
+
+            <!-- Users panel -->
+            <div class="users-panel">
+              <div class="panel-header">
+                <span class="panel-title">Users</span>
+                <span class="panel-badge" id="userCountBadge">0</span>
+              </div>
+              <div class="user-list" id="userList">
+                <div class="user-empty">
+                  <div class="user-empty-icon">👤</div>
+                  <span>No one connected yet</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Chat monitor -->
+            <div class="chat-monitor-panel">
+              <div class="card-section-title">
+                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                </svg>
+                Live Chat Monitor
+                <span class="live-badge">LIVE</span>
+              </div>
+              <div class="admin-chat-box" id="adminMessages">
+                <div class="chat-empty-hint">Waiting for messages...</div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Pin section -->
+          <div class="pin-section-card">
+            <div class="card-section-title" style="padding:0 0 12px;border-bottom:1px solid #f1f5f9;margin-bottom:12px;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="#475569">
+                <path d="M16 12V4h1a1 1 0 000-2H7a1 1 0 000 2h1v8l-2 2v2h5v6h2v-6h5v-2l-2-2z"/>
+              </svg>
+              Pin Message
+            </div>
+
+            <div id="currentPinDisplay" class="current-pin hidden">
+              <div class="current-pin-label">Currently pinned</div>
+              <div id="currentPinText" class="current-pin-text"></div>
+            </div>
+
+            <textarea
+              id="pinInput"
+              class="textarea"
+              rows="2"
+              placeholder="Type a custom message to pin... (or click 📌 on a chat message above)"
+              maxlength="300"
+            ></textarea>
+
+            <div style="display:flex;gap:8px;margin-top:10px;">
+              <button class="btn" style="flex:1;height:40px;" onclick="pinMessage()">📌 Pin Custom</button>
+              <button class="btn btn-danger" style="flex:1;height:40px;" onclick="unpinMessage()">🗑 Unpin</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== TAB: Censored Words ========== -->
+    <div id="tab-words" class="tab-panel hidden">
+      <div class="admin-page-header">
+        <div>
+          <h2 class="admin-page-title">Censored Words</h2>
+          <p class="admin-page-desc">Words below are replaced with *** in all chat messages. Saved automatically.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="word-add-row">
+          <input
+            id="wordInput"
+            class="input"
+            type="text"
+            placeholder="Type a word to censor and press Enter..."
+            maxlength="50"
+            onkeypress="if(event.key==='Enter') addWord()"
+          >
+          <button class="btn" style="width:auto;padding:0 24px;flex-shrink:0;" onclick="addWord()">Add Word</button>
+        </div>
+        <div id="wordList" class="word-list">
+          <div style="color:#94a3b8;font-size:0.875rem;">Loading...</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- QR Detail Modal -->
+  <div class="qr-modal-overlay hidden" id="qrModal" onclick="closeQRModal()">
+    <div class="qr-modal-box" onclick="event.stopPropagation()">
+      <button class="qr-modal-close" onclick="closeQRModal()">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+      <h3 class="qr-modal-title">QR Code</h3>
+      <img id="qrDetailImg" src="" alt="QR Code" class="qr-modal-img">
+      <div class="qr-modal-url" id="qrDetailUrl"></div>
+      <div class="qr-modal-actions">
+        <button class="btn btn-outline" style="flex:1;" onclick="copyLink(); showToast('Link copied!')">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <rect x="9" y="9" width="13" height="13" rx="2"/>
+            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+          </svg>
+          Copy Link
+        </button>
+        <button class="btn" style="flex:1;" onclick="downloadQR()">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Download PNG
+        </button>
       </div>
     </div>
   </div>
 
   <script>
     let currentRoomId = null;
-    let currentToken = null;
     let currentChatURL = null;
     let currentStreamURL = null;
+    let adminWs = null;
 
+    // ===== Tab =====
+    function switchTab(name, btn) {
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+      document.querySelectorAll('.admin-nav-item').forEach(t => t.classList.remove('active'));
+      document.getElementById('tab-' + name).classList.remove('hidden');
+      btn.classList.add('active');
+      if (name === 'words') loadWords();
+    }
+
+    // ===== Create Room =====
     async function createRoom() {
       const btn = document.getElementById('createBtn');
       btn.disabled = true;
@@ -71,21 +306,34 @@
       try {
         const res = await fetch('/api/room', { method: 'POST' });
         const data = await res.json();
-        
+
         currentRoomId = data.room_id;
-        currentToken = data.token;
         currentChatURL = data.chat_url;
         currentStreamURL = data.stream_url;
-        
+
         document.getElementById('qrImage').src = data.qr_url;
+        document.getElementById('emptyState').classList.add('hidden');
         document.getElementById('roomResult').classList.remove('hidden');
-        
-      } catch (err) {
+        document.getElementById('currentPinDisplay').classList.add('hidden');
+        document.getElementById('pinInput').value = '';
+        document.getElementById('adminMessages').innerHTML = '<div class="chat-empty-hint">Waiting for messages...</div>';
+        document.getElementById('userList').innerHTML = '<div class="user-empty"><div class="user-empty-icon">👤</div><span>No one connected yet</span></div>';
+        document.getElementById('statUsers').textContent = '0';
+        document.getElementById('statMessages').textContent = '0';
+        document.getElementById('statPinStatus').textContent = 'None';
+        document.getElementById('userCountBadge').textContent = '0';
+
+        document.getElementById('sidebarRoomId').textContent = data.room_id;
+        document.getElementById('sidebarRoomStatus').classList.remove('hidden');
+
+        connectAdminStream();
+
+      } catch {
         alert('Failed to create room');
       } finally {
         btn.disabled = false;
         btn.innerHTML = `
-          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path d="M12 5v14m-7-7h14"/>
           </svg>
           Create New Room
@@ -93,40 +341,276 @@
       }
     }
 
+    // ===== Room Actions =====
     async function addInvite() {
       if (!currentRoomId) return;
-
       try {
         const res = await fetch(`/api/room/${currentRoomId}/invite`, { method: 'POST' });
         const data = await res.json();
-        
-        currentToken = data.token;
         currentChatURL = data.chat_url;
-        
         document.getElementById('qrImage').src = data.qr_url;
-        alert('New invite generated! Previous link is now invalid for new users.');
-        
-      } catch (err) {
-        alert('Failed to generate invite');
-      }
+        showToast('New invite link generated!');
+      } catch { alert('Failed to generate invite'); }
     }
 
     function copyLink() {
       if (!currentChatURL) return;
-      navigator.clipboard.writeText(currentChatURL).then(() => {
-        alert('Chat link copied! (single-use)');
-      }).catch(() => {
-        prompt('Copy this link:', currentChatURL);
-      });
+      navigator.clipboard.writeText(currentChatURL)
+        .then(() => showToast('Chat link copied!'))
+        .catch(() => prompt('Copy this link:', currentChatURL));
     }
 
     function copyStreamLink() {
       if (!currentStreamURL) return;
-      navigator.clipboard.writeText(currentStreamURL).then(() => {
-        alert('Stream link copied!');
-      }).catch(() => {
-        prompt('Copy this link:', currentStreamURL);
-      });
+      navigator.clipboard.writeText(currentStreamURL)
+        .then(() => showToast('Stream link copied!'))
+        .catch(() => prompt('Copy this link:', currentStreamURL));
+    }
+
+    function openStream() {
+      if (currentStreamURL) window.open(currentStreamURL, '_blank');
+    }
+
+    // ===== QR Modal =====
+    function viewQRDetail() {
+      const src = document.getElementById('qrImage').src;
+      if (!src) return;
+      document.getElementById('qrDetailImg').src = src;
+      document.getElementById('qrDetailUrl').textContent = currentChatURL || '';
+      document.getElementById('qrModal').classList.remove('hidden');
+    }
+
+    function closeQRModal() {
+      document.getElementById('qrModal').classList.add('hidden');
+    }
+
+    async function downloadQR() {
+      const src = document.getElementById('qrImage').src;
+      if (!src) return;
+      try {
+        const res = await fetch(src);
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `qr-room-${currentRoomId}.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('QR downloaded!');
+      } catch {
+        window.open(src, '_blank');
+      }
+    }
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeQRModal();
+    });
+
+    // ===== Pin =====
+    async function pinMessage() {
+      if (!currentRoomId) return;
+      const content = document.getElementById('pinInput').value.trim();
+      if (!content) { showToast('Please type a message to pin.', 'warn'); return; }
+
+      try {
+        const res = await fetch(`/api/room/${currentRoomId}/pin`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content, name: 'Admin' })
+        });
+        const data = await res.json();
+        if (data.pinnedMessage) setCurrentPin(data.pinnedMessage.name, data.pinnedMessage.content);
+        document.getElementById('pinInput').value = '';
+        showToast('Message pinned!');
+      } catch { alert('Failed to pin message'); }
+    }
+
+    async function unpinMessage() {
+      if (!currentRoomId) return;
+      try {
+        await fetch(`/api/room/${currentRoomId}/pin`, { method: 'DELETE' });
+        document.getElementById('currentPinDisplay').classList.add('hidden');
+        document.getElementById('statPinStatus').textContent = 'None';
+        showToast('Unpinned.');
+      } catch { alert('Failed to unpin'); }
+    }
+
+    async function pinUserMessage(name, content) {
+      if (!currentRoomId) return;
+      try {
+        const res = await fetch(`/api/room/${currentRoomId}/pin`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content, name })
+        });
+        const data = await res.json();
+        if (data.pinnedMessage) setCurrentPin(data.pinnedMessage.name, data.pinnedMessage.content);
+        showToast(`Pinned message from ${name}`);
+      } catch { alert('Failed to pin message'); }
+    }
+
+    function setCurrentPin(name, content) {
+      document.getElementById('currentPinText').textContent = `${name}: ${content}`;
+      document.getElementById('currentPinDisplay').classList.remove('hidden');
+      const short = content.length > 12 ? content.slice(0, 12) + '…' : content;
+      document.getElementById('statPinStatus').textContent = short;
+    }
+
+    // ===== WebSocket Admin Stream =====
+    function connectAdminStream() {
+      if (adminWs) { adminWs.close(); adminWs = null; }
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      adminWs = new WebSocket(`${protocol}//${window.location.host}/ws-stream/${currentRoomId}`);
+
+      adminWs.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'history') {
+          msg.messages.forEach(m => renderAdminMessage(m));
+        } else if (msg.type === 'chat') {
+          renderAdminMessage(msg);
+        } else if (msg.type === 'status') {
+          updateStats(msg);
+        } else if (msg.type === 'pin') {
+          setCurrentPin(msg.pinnedMessage.name, msg.pinnedMessage.content);
+        } else if (msg.type === 'unpin') {
+          document.getElementById('currentPinDisplay').classList.add('hidden');
+          document.getElementById('statPinStatus').textContent = 'None';
+        }
+      };
+    }
+
+    // ===== Stats & User List =====
+    function updateStats(status) {
+      document.getElementById('statUsers').textContent = status.userCount || 0;
+      document.getElementById('statMessages').textContent = status.messageCount || 0;
+      document.getElementById('userCountBadge').textContent = status.userCount || 0;
+
+      renderUserList(status.users || []);
+    }
+
+    const avatarColors = [
+      '#6366f1','#8b5cf6','#ec4899','#f59e0b',
+      '#10b981','#3b82f6','#ef4444','#14b8a6'
+    ];
+
+    function getAvatarColor(name) {
+      let hash = 0;
+      for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
+      return avatarColors[Math.abs(hash) % avatarColors.length];
+    }
+
+    function renderUserList(users) {
+      const container = document.getElementById('userList');
+      if (!users.length) {
+        container.innerHTML = '<div class="user-empty"><div class="user-empty-icon">👤</div><span>No one connected yet</span></div>';
+        return;
+      }
+      container.innerHTML = users.map(name => `
+        <div class="user-item">
+          <div class="user-avatar" style="background:${getAvatarColor(name)}">${escapeHtml(name.charAt(0).toUpperCase())}</div>
+          <div class="user-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
+        </div>
+      `).join('');
+    }
+
+    // ===== Chat Monitor =====
+    function renderAdminMessage(msg) {
+      if (!msg.content || msg.name === '__stream__') return;
+
+      const container = document.getElementById('adminMessages');
+      const hint = container.querySelector('.chat-empty-hint');
+      if (hint) hint.remove();
+
+      const div = document.createElement('div');
+      div.className = 'admin-msg';
+
+      const body = document.createElement('div');
+      body.className = 'admin-msg-body';
+      body.innerHTML = `<span class="admin-msg-name">${escapeHtml(msg.name)}</span><span class="admin-msg-content">${escapeHtml(msg.content)}</span>`;
+
+      const pinBtn = document.createElement('button');
+      pinBtn.className = 'admin-msg-pin';
+      pinBtn.title = 'Pin this message';
+      pinBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M16 12V4h1a1 1 0 000-2H7a1 1 0 000 2h1v8l-2 2v2h5v6h2v-6h5v-2l-2-2z"/></svg>`;
+      pinBtn.addEventListener('click', () => pinUserMessage(msg.name, msg.content));
+
+      div.appendChild(body);
+      div.appendChild(pinBtn);
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    // ===== Censored Words =====
+    async function loadWords() {
+      try {
+        const res = await fetch('/api/admin/words');
+        const data = await res.json();
+        renderWords(data.words);
+      } catch {
+        document.getElementById('wordList').innerHTML = '<div style="color:#ef4444">Failed to load words</div>';
+      }
+    }
+
+    function renderWords(words) {
+      const container = document.getElementById('wordList');
+      if (!words.length) {
+        container.innerHTML = '<div style="color:#94a3b8;font-size:0.875rem;padding:8px 0;">No censored words yet. Add one above.</div>';
+        return;
+      }
+      container.innerHTML = words.map(w => `
+        <span class="word-tag">${escapeHtml(w)}
+          <button class="word-tag-delete" onclick="deleteWord('${escapeHtml(w)}')" title="Remove">✕</button>
+        </span>
+      `).join('');
+    }
+
+    async function addWord() {
+      const input = document.getElementById('wordInput');
+      const word = input.value.trim();
+      if (!word) return;
+      try {
+        const res = await fetch('/api/admin/words', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ word })
+        });
+        const data = await res.json();
+        if (res.status === 409) { showToast('Word already in list', 'warn'); return; }
+        if (!res.ok) { alert(data.error || 'Failed'); return; }
+        renderWords(data.words);
+        input.value = '';
+        input.focus();
+        showToast(`"${word}" added`);
+      } catch { alert('Failed to add word'); }
+    }
+
+    async function deleteWord(word) {
+      try {
+        const res = await fetch(`/api/admin/words/${encodeURIComponent(word)}`, { method: 'DELETE' });
+        const data = await res.json();
+        renderWords(data.words);
+        showToast(`"${word}" removed`);
+      } catch { alert('Failed to remove word'); }
+    }
+
+    // ===== Toast =====
+    function showToast(msg, type = 'success') {
+      const t = document.createElement('div');
+      t.className = `toast toast-${type}`;
+      t.textContent = msg;
+      document.body.appendChild(t);
+      requestAnimationFrame(() => t.classList.add('toast-visible'));
+      setTimeout(() => {
+        t.classList.remove('toast-visible');
+        setTimeout(() => t.remove(), 300);
+      }, 2500);
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
     }
   </script>
 </body>

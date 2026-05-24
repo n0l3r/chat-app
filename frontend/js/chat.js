@@ -54,6 +54,8 @@ function connectWebSocket() {
   
   ws.onmessage = (event) => {
     const msg = JSON.parse(event.data);
+    if (msg.type === 'pin') { showPin(msg.pinnedMessage); return; }
+    if (msg.type === 'unpin') { hidePin(); return; }
     renderMessage(msg);
   };
 }
@@ -101,6 +103,16 @@ function sendMessage() {
   
   ws.send(JSON.stringify({ content }));
   input.value = '';
+}
+
+function showPin(pin) {
+  document.getElementById('pinnedName').textContent = pin.name ? pin.name + ': ' : '';
+  document.getElementById('pinnedContent').textContent = pin.content || '';
+  document.getElementById('pinnedBanner').classList.remove('hidden');
+}
+
+function hidePin() {
+  document.getElementById('pinnedBanner').classList.add('hidden');
 }
 
 function escapeHtml(text) {

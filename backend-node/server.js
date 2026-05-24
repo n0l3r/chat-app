@@ -33,6 +33,17 @@ app.post('/api/room', roomHandler.createRoom);
 app.post('/api/room/:roomId/invite', roomHandler.addInvite);
 app.get('/api/qr/:token', roomHandler.getQRCode);
 
+// Room list & pin management
+app.get('/api/admin/rooms', roomHandler.getRooms);
+app.get('/api/room/:roomId/pin', roomHandler.getPinnedMessage);
+app.post('/api/room/:roomId/pin', roomHandler.pinMessage);
+app.delete('/api/room/:roomId/pin', roomHandler.unpinMessage);
+
+// Censored words management
+app.get('/api/admin/words', roomHandler.getWords);
+app.post('/api/admin/words', roomHandler.addWord);
+app.delete('/api/admin/words/:word', roomHandler.removeWord);
+
 // Redirect root to a placeholder
 app.get('/', (req, res) => {
   res.send(`
@@ -54,11 +65,10 @@ app.get('/admin-panel-secret-access-2026', (req, res) => {
 // Chat page - validates token before serving
 app.get('/c/:token', (req, res) => {
   const token = req.params.token;
-  const userIP = req.ip || req.connection.remoteAddress;
 
-  const { room, valid } = manager.checkInvite(token, userIP);
+  const { room, valid } = manager.checkInvite(token);
   if (!valid || !room) {
-    return res.status(403).send('This invite link has already been used');
+    return res.status(404).send('Invalid or expired invite link');
   }
   
   // Serve static HTML
@@ -205,13 +215,66 @@ app.get('/s/:roomId', (req, res) => {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.3; }
     }
+
+    .pinned-banner {
+      display: none;
+      background: rgba(99, 102, 241, 0.85);
+      border: 4px solid #a78bfa;
+      border-radius: 40px;
+      padding: 30px 50px;
+      margin-bottom: 16px;
+      animation: slideInFromBottom 0.4s ease-out;
+      word-wrap: break-word;
+    }
+
+    .pinned-banner.visible {
+      display: block;
+    }
+
+    .pinned-banner .pin-label {
+      font-size: 2rem;
+      color: #e0e7ff;
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    .pinned-banner .pin-name {
+      font-size: 3rem;
+      font-weight: 700;
+      color: #fde68a;
+      display: block;
+      margin-bottom: 8px;
+      line-height: 1.1;
+    }
+
+    .pinned-banner .pin-content {
+      font-size: 3.8rem;
+      color: #fff;
+      line-height: 1.2;
+      display: block;
+    }
+
+    .messages-wrap {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
   </style>
 </head>
 <body>
-  <div class="stream-container">
+  <div class="stream-container" style="display:flex;flex-direction:column;">
     <div class="stream-label">LIVE CHAT</div>
     <div class="connection-status" id="status"></div>
-    <div class="messages" id="messages"></div>
+
+    <div class="pinned-banner" id="pinnedBanner">
+      <span class="pin-label">📌 Pinned</span>
+      <span class="pin-name" id="pinnedName"></span>
+      <span class="pin-content" id="pinnedContent"></span>
+    </div>
+
+    <div class="messages" id="messages" style="flex:1;height:auto;"></div>
   </div>
 
   <script>
@@ -240,9 +303,22 @@ app.get('/s/:roomId', (req, res) => {
 
       ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
+        if (msg.type === 'pin') { showPin(msg.pinnedMessage); return; }
+        if (msg.type === 'unpin') { hidePin(); return; }
+        if (msg.type === 'history' || msg.type === 'status') return;
         if (msg.name === '__stream__' || msg.type === 'system') return;
         renderMessage(msg);
       };
+    }
+
+    function showPin(pin) {
+      document.getElementById('pinnedName').textContent = pin.name || 'Admin';
+      document.getElementById('pinnedContent').textContent = pin.content || '';
+      document.getElementById('pinnedBanner').classList.add('visible');
+    }
+
+    function hidePin() {
+      document.getElementById('pinnedBanner').classList.remove('visible');
     }
 
     function renderMessage(msg) {
@@ -250,7 +326,6 @@ app.get('/s/:roomId', (req, res) => {
       const div = document.createElement('div');
       const safeName = msg.name || 'Anonymous';
       const safeContent = msg.content || '';
-      const safeTime = msg.timestamp || '';
       div.className = 'message';
       div.innerHTML = \`
         <div class="name">\${escapeHtml(safeName)}</div>
@@ -258,10 +333,8 @@ app.get('/s/:roomId', (req, res) => {
       \`;
       div.querySelector('.name').style.color = getNameColor(safeName);
 
-      // Add to top (will appear at bottom due to flex-direction: column-reverse)
       container.insertBefore(div, container.firstChild);
 
-      // Keep only recent messages
       while (container.children.length > maxMessages) {
         container.removeChild(container.lastChild);
       }
@@ -312,6 +385,6 @@ wss.on('connection', (ws, req) => {
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🌍 Environment: ${NODE_ENV}`);
-  console.log(`📱 Admin panel: ${BASE_URL}/admin-panel-secret-access-2024`);
+  console.log(`📱 Admin panel: ${BASE_URL}/admin-panel-secret-access-2026`);
   console.log(`📺 Stream example: ${BASE_URL}/s/ROOM_ID`);
 });
