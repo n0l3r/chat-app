@@ -288,6 +288,65 @@
     let currentStreamURL = null;
     let adminWs = null;
 
+    // ===== Restore room state on page load =====
+    async function restoreRoom() {
+      try {
+        const res = await fetch('/api/admin/rooms');
+        const data = await res.json();
+        if (!data.rooms || data.rooms.length === 0) {
+          localStorage.removeItem('adminRoom');
+          return;
+        }
+
+        // Pick the active room from server
+        const active = data.rooms[0];
+
+        // Try to get chat/stream URLs from localStorage (same device)
+        let state = null;
+        try { state = JSON.parse(localStorage.getItem('adminRoom') || 'null'); } catch {}
+
+        // If localStorage has a different room, discard it
+        if (state && state.roomId !== active.id) state = null;
+
+        currentRoomId    = active.id;
+        currentChatURL   = state?.chatURL   || null;
+        currentStreamURL = state?.streamURL || `${window.location.origin}/s/${active.id}`;
+
+        // QR: use stored URL, or generate a new invite to get a fresh one
+        if (state?.qrUrl) {
+          document.getElementById('qrImage').src = state.qrUrl;
+        } else {
+          // Device baru — generate fresh invite so we have a QR to show
+          const inv = await fetch(`/api/room/${active.id}/invite`, { method: 'POST' });
+          const invData = await inv.json();
+          currentChatURL = invData.chat_url;
+          document.getElementById('qrImage').src = invData.qr_url;
+          saveRoomToStorage();
+        }
+
+        document.getElementById('emptyState').classList.add('hidden');
+        document.getElementById('roomResult').classList.remove('hidden');
+        document.getElementById('sidebarRoomId').textContent = active.id;
+        document.getElementById('sidebarRoomStatus').classList.remove('hidden');
+
+        if (active.pinnedMessage) {
+          setCurrentPin(active.pinnedMessage.name, active.pinnedMessage.content);
+        }
+
+        connectAdminStream();
+      } catch { /* server unreachable */ }
+    }
+
+    function saveRoomToStorage() {
+      if (!currentRoomId) return;
+      localStorage.setItem('adminRoom', JSON.stringify({
+        roomId:      currentRoomId,
+        chatURL:     currentChatURL,
+        streamURL:   currentStreamURL || `${window.location.origin}/s/${currentRoomId}`,
+        qrUrl:       document.getElementById('qrImage').src
+      }));
+    }
+
     // ===== Tab =====
     function switchTab(name, btn) {
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
@@ -299,6 +358,7 @@
 
     // ===== Create Room =====
     async function createRoom() {
+      localStorage.removeItem('adminRoom');
       const btn = document.getElementById('createBtn');
       btn.disabled = true;
       btn.textContent = 'Creating...';
@@ -312,6 +372,7 @@
         currentStreamURL = data.stream_url;
 
         document.getElementById('qrImage').src = data.qr_url;
+        saveRoomToStorage();
         document.getElementById('emptyState').classList.add('hidden');
         document.getElementById('roomResult').classList.remove('hidden');
         document.getElementById('currentPinDisplay').classList.add('hidden');
@@ -349,6 +410,7 @@
         const data = await res.json();
         currentChatURL = data.chat_url;
         document.getElementById('qrImage').src = data.qr_url;
+        saveRoomToStorage();
         showToast('New invite link generated!');
       } catch { alert('Failed to generate invite'); }
     }
@@ -612,6 +674,9 @@
       div.textContent = text;
       return div.innerHTML;
     }
+
+    // Restore on load
+    restoreRoom();
   </script>
 </body>
 </html>
