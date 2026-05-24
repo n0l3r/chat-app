@@ -67,19 +67,25 @@ function getWords() {
   return [...badWords];
 }
 
+function maskWord(match) {
+  if (match.length <= 2) return '*'.repeat(match.length);
+  if (match.length <= 4) return match[0] + '*'.repeat(match.length - 2) + match[match.length - 1];
+  return match[0] + match[1] + '*'.repeat(match.length - 3) + match[match.length - 1];
+}
+
 function censorMessage(text) {
   let censored = text;
 
   badWords.forEach(word => {
     const regex = new RegExp(escapeRegex(word), 'gi');
-    censored = censored.replace(regex, (match) => '*'.repeat(match.length));
+    censored = censored.replace(regex, maskWord);
   });
 
-  censored = censored.replace(/k[0o]nt[0o]l/gi, (m) => '*'.repeat(m.length));
-  censored = censored.replace(/[4@]nj[1i]ng/gi, (m) => '*'.repeat(m.length));
-  censored = censored.replace(/b[4@]ng[5s][4@]t/gi, (m) => '*'.repeat(m.length));
-  censored = censored.replace(/f[*\-_]?u[*\-_]?c[*\-_]?k/gi, (m) => '*'.repeat(m.length));
-  censored = censored.replace(/[5s]h[1i]t/gi, (m) => '*'.repeat(m.length));
+  censored = censored.replace(/k[0o]nt[0o]l/gi, maskWord);
+  censored = censored.replace(/[4@]nj[1i]ng/gi, maskWord);
+  censored = censored.replace(/b[4@]ng[5s][4@]t/gi, maskWord);
+  censored = censored.replace(/f[*\-_]?u[*\-_]?c[*\-_]?k/gi, maskWord);
+  censored = censored.replace(/[5s]h[1i]t/gi, maskWord);
 
   return censored;
 }
